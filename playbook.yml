@@ -1,0 +1,136 @@
+---
+- name: Install and configure Ollama with Open WebUI
+  hosts: ollama_servers
+  become: true  # Run tasks as sudo
+
+  vars:
+    ollama_model: "llama3.2:3b"
+    ollama_user: "{{ ansible_user }}"
+
+  tasks:
+
+    # -------------------------------------------------------
+    # 1. Install dependencies
+    # -------------------------------------------------------
+    - name: Install required dependencies
+      ansible.builtin.apt:
+        name:
+          - zstd
+          - curl
+        state: present
+        update_cache: true
+
+    # -------------------------------------------------------
+    # 2. Install Ollama
+    # -------------------------------------------------------
+    - name: Download and run the Ollama install script
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://ollama.com/install.sh | sh
+        creates: /usr/local/bin/ollama
+
+    # -------------------------------------------------------
+    # 3. Configure Ollama to listen on all interfaces
+    #    (required so Docker containers can reach it)
+    # -------------------------------------------------------
+    - name: Create Ollama systemd override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/ollama.service.d
+        state: directory
+        mode: '0755'
+
+    - name: Set OLLAMA_HOST to 0.0.0.0
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ollama.service.d/override.conf
+        content: |
+          [Service]
+          Environment="OLLAMA_HOST=0.0.0.0"
+        mode: '0644'
+      notify: Restart Ollama
+
+    # -------------------------------------------------------
+    # 4. Start the Ollama service
+    # -------------------------------------------------------
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable and start the Ollama systemd service
+      ansible.builtin.systemd:
+        name: ollama
+        enabled: true
+        state: started
+
+    # -------------------------------------------------------
+    # 5. Wait for Ollama to be ready before pulling a model
+    # -------------------------------------------------------
+    - name: Wait for Ollama API to be available
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 11434
+        timeout: 30
+
+    # -------------------------------------------------------
+    # 6. Pull the model
+    # -------------------------------------------------------
+    - name: Pull the {{ ollama_model }} model
+      ansible.builtin.command:
+        cmd: ollama pull {{ ollama_model }}
+      become_user: "{{ ollama_user }}"
+      register: pull_result
+      changed_when: "'pulling' in pull_result.stdout"
+
+    # -------------------------------------------------------
+    # 7. Confirm everything worked
+    # -------------------------------------------------------
+    - name: List installed Ollama models
+      ansible.builtin.command:
+        cmd: ollama list
+      become_user: "{{ ollama_user }}"
+      register: model_list
+      changed_when: false
+
+    - name: Show installed models
+      ansible.builtin.debug:
+        msg: "{{ model_list.stdout_lines }}"
+
+    # -------------------------------------------------------
+    # 8. Install Docker
+    # -------------------------------------------------------
+    - name: Download and run the Docker install script
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://get.docker.com | sh
+        creates: /usr/bin/docker
+
+    - name: Add user to docker group
+      ansible.builtin.user:
+        name: "{{ ollama_user }}"
+        groups: docker
+        append: true
+
+    # -------------------------------------------------------
+    # 9. Run Open WebUI
+    #    Uses host.docker.internal so the container can reach
+    #    Ollama running on the host machine
+    # -------------------------------------------------------
+    - name: Start Open WebUI container
+      ansible.builtin.shell:
+        cmd: |
+          docker run -d \
+            --name open-webui \
+            --restart always \
+            -p 3000:8080 \
+            --add-host=host.docker.internal:host-gateway \
+            -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+            -v open-webui:/app/backend/data \
+            ghcr.io/open-webui/open-webui:main
+        creates: /var/lib/docker/volumes/open-webui
+
+  # -------------------------------------------------------
+  # Handlers — only run when notified
+  # -------------------------------------------------------
+  handlers:
+    - name: Restart Ollama
+      ansible.builtin.systemd:
+        name: ollama
+        state: restarted
+        daemon_reload: true
