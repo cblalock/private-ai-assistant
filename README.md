@@ -1,10 +1,4 @@
-# ollama-ansible
-
-Ansible playbook that provisions a fully working private AI assistant from scratch with a single command. Built around a real-world scenario: a business that needs an internal AI tool but cannot send sensitive client data to third-party servers like OpenAI or Anthropic.
-
-## What it deploys
-
-# ollama-ansible
+# private ai assistant
 
 Ansible playbook that provisions a fully working private AI assistant from scratch with a single command. Built around a real-world scenario: a business that needs an internal AI tool but cannot send sensitive client data to third-party servers like OpenAI or Anthropic.
 
