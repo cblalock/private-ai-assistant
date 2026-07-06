@@ -29,7 +29,7 @@ The same pattern applies to any privacy-sensitive industry: healthcare, legal, f
 
 **1. Clone the repo**
 ```bash
-git clone https://github.com/cblalock/ollama-ansible.git
+git clone https://github.com/cblalock/private-ai-assistant.git
 cd ollama-ansible
 ```
 
