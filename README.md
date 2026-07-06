@@ -2,6 +2,9 @@
 
 Ansible playbook that provisions a fully working private AI assistant from scratch with a single command. Built around a real-world scenario: a business that needs an internal AI tool but cannot send sensitive client data to third-party servers like OpenAI or Anthropic.
 
+<img width="1895" height="912" alt="localLLM" src="https://github.com/user-attachments/assets/f9dee85d-b28c-4bc1-9daa-929c850110d2" />
+
+
 ## What it deploys
 
 - **Ollama** — runs the LLM locally as a background service
